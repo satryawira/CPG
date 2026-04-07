@@ -43,7 +43,7 @@
     "uuid": "^10.0.0",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",
-    "xendit-node": "^5.2.0",
+    "xendit-node": "^6.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

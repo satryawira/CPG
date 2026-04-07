@@ -205,9 +205,9 @@ export async function getDashboardStats() {
   ]);
 
   const [monthVolume] = await prisma.$queryRaw<Array<{ total: string }>>`
-    SELECT COALESCE(SUM("idr_amount_net"), 0)::text as total
+    SELECT COALESCE(SUM("idrAmountNet"), 0)::text as total
     FROM cashout_requests
-    WHERE status = 'COMPLETED' AND created_at >= ${startOfMonth}
+    WHERE status = 'COMPLETED' AND "createdAt" >= ${startOfMonth}
   `;
 
   return {
