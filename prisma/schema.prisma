@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum KycStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum KycDocumentType {
+  KTP
+  PASSPORT
+  SELFIE
+  NPWP
+}
+
+enum WalletCurrency {
+  BTC
+  ETH
+  USDT
+  BNB
+  SOL
+  IDR
+}
+
+enum NetworkType {
+  ERC20
+  TRC20
+  BEP20
+  NATIVE
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  CASHOUT
+  FEE
+  INTERNAL
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum ExchangeProvider {
+  BINANCE
+  INDODAX
+  TOKOCRYPTO
+  OKX
+}
+
+enum PaymentProvider {
+  MIDTRANS
+  XENDIT
+  FLIP
+}
+
+// ─── MODELS ──────────────────────────────────────────────────────────────────
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  phone         String?    @unique
+  passwordHash  String
+  fullName      String
+  role          UserRole   @default(USER)
+  status        UserStatus @default(ACTIVE)
+  emailVerified Boolean    @default(false)
+  phoneVerified Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  kyc             Kyc?
+  wallets         Wallet[]
+  bankAccounts    BankAccount[]
+  cashoutRequests CashoutRequest[]
+  sessions        Session[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Kyc {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  status      KycStatus @default(PENDING)
+  fullName    String?
+  idNumber    String?
+  dateOfBirth DateTime?
+  address     String?
+  rejectedAt  DateTime?
+  approvedAt  DateTime?
+  reviewedBy  String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user      User          @relation(fields: [userId], references: [id])
+  documents KycDocument[]
+
+  @@map("kyc")
+}
+
+model KycDocument {
+  id           String          @id @default(uuid())
+  kycId        String
+  documentType KycDocumentType
+  fileUrl      String
+  fileKey      String
+  mimeType     String
+  uploadedAt   DateTime        @default(now())
+
+  kyc Kyc @relation(fields: [kycId], references: [id])
+
+  @@map("kyc_documents")
+}
+
+model Wallet {
+  id             String         @id @default(uuid())
+  userId         String
+  currency       WalletCurrency
+  network        NetworkType?
+  balance        Decimal        @default(0) @db.Decimal(36, 18)
+  lockedBalance  Decimal        @default(0) @db.Decimal(36, 18)
+  depositAddress String?        @unique
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+
+  @@unique([userId, currency, network])
+  @@map("wallets")
+}
+
+model BankAccount {
+  id            String   @id @default(uuid())
+  userId        String
+  bankCode      String
+  bankName      String
+  accountNumber String
+  accountName   String
+  isDefault     Boolean  @default(false)
+  isVerified    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user            User             @relation(fields: [userId], references: [id])
+  cashoutRequests CashoutRequest[]
+
+  @@unique([userId, bankCode, accountNumber])
+  @@map("bank_accounts")
+}
+
+model Transaction {
+  id          String            @id @default(uuid())
+  walletId    String
+  type        TransactionType
+  status      TransactionStatus @default(PENDING)
+  amount      Decimal           @db.Decimal(36, 18)
+  fee         Decimal           @default(0) @db.Decimal(36, 18)
+  netAmount   Decimal           @db.Decimal(36, 18)
+  currency    WalletCurrency
+  txHash      String?
+  reference   String?           @unique
+  notes       String?
+  metadata    Json?
+  confirmedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  wallet         Wallet          @relation(fields: [walletId], references: [id])
+  cashoutRequest CashoutRequest?
+
+  @@index([walletId])
+  @@index([txHash])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model CashoutRequest {
+  id            String            @id @default(uuid())
+  userId        String
+  bankAccountId String
+  transactionId String?           @unique
+  status        TransactionStatus @default(PENDING)
+
+  cryptoCurrency WalletCurrency
+  cryptoAmount   Decimal        @db.Decimal(36, 18)
+  cryptoNetwork  NetworkType
+
+  exchangeProvider ExchangeProvider?
+  exchangeOrderId  String?
+  exchangeRate     Decimal?          @db.Decimal(20, 8)
+  exchangeFee      Decimal?          @db.Decimal(20, 8)
+
+  idrAmountGross Decimal?        @db.Decimal(20, 2)
+  platformFee    Decimal?        @db.Decimal(20, 2)
+  idrAmountNet   Decimal?        @db.Decimal(20, 2)
+
+  paymentProvider PaymentProvider?
+  disbursementId  String?
+  disbursedAt     DateTime?
+
+  expiredAt     DateTime?
+  completedAt   DateTime?
+  failedAt      DateTime?
+  failureReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id])
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("cashout_requests")
+}
+
+model ExchangeRate {
+  id            String           @id @default(uuid())
+  provider      ExchangeProvider
+  baseCurrency  WalletCurrency
+  bidPrice      Decimal          @db.Decimal(20, 8)
+  askPrice      Decimal          @db.Decimal(20, 8)
+  timestamp     DateTime         @default(now())
+
+  @@index([provider, baseCurrency, timestamp])
+  @@map("exchange_rates")
+}
+
+model FeeConfig {
+  id         String         @id @default(uuid())
+  currency   WalletCurrency
+  type       String
+  feePercent Decimal        @db.Decimal(5, 4)
+  feeFlat    Decimal        @default(0) @db.Decimal(20, 2)
+  minFee     Decimal        @default(0) @db.Decimal(20, 2)
+  maxFee     Decimal?       @db.Decimal(20, 2)
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([currency, type])
+  @@map("fee_configs")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
