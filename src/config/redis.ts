@@ -2,18 +2,36 @@ import IORedis from 'ioredis';
 import { env } from './env';
 import { logger } from './logger';
 
-export const redis = new IORedis(env.REDIS_URL, {
-  password: env.REDIS_PASSWORD || undefined,
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-  retryStrategy: (times) => {
-    if (times > 10) return null;
-    return Math.min(times * 100, 3000);
+let _redis: IORedis | null = null;
+
+function createRedisClient(): IORedis {
+  const client = new IORedis(env.REDIS_URL, {
+    password: env.REDIS_PASSWORD || undefined,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    lazyConnect: true,
+    retryStrategy: (times) => {
+      if (times > 10) return null;
+      return Math.min(times * 100, 3000);
+    },
+  });
+  client.on('connect', () => logger.info('Redis connected'));
+  client.on('error', (err) => logger.error('Redis error', { error: err.message }));
+  return client;
+}
+
+export function getRedis(): IORedis {
+  if (!_redis) {
+    _redis = createRedisClient();
+  }
+  return _redis;
+}
+
+export const redis = new Proxy({} as IORedis, {
+  get(_target, prop) {
+    return (getRedis() as unknown as Record<string | symbol, unknown>)[prop];
   },
 });
-
-redis.on('connect', () => logger.info('Redis connected'));
-redis.on('error', (err) => logger.error('Redis error', { error: err.message }));
 
 export const REDIS_KEYS = {
   cashoutQuote: (userId: string) => `cashout:quote:${userId}`,
