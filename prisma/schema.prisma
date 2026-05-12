@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
 }
 
 datasource db {
@@ -7,7 +8,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── ENUMS ───────────────────────────────────────────────────────────────────
+// ─── ENUMS ─────────────────────────────────────────────────────────────────────────
 
 enum UserRole {
   USER
@@ -81,7 +82,7 @@ enum PaymentProvider {
   FLIP
 }
 
-// ─── MODELS ──────────────────────────────────────────────────────────────────
+// ─── MODELS ─────────────────────────────────────────────────────────────────────────
 
 model User {
   id            String     @id @default(uuid())

@@ -13,7 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "lint": "eslint src/**/*.ts"
+    "lint": "eslint src/**/*.ts",
+    "build:netlify": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.691.0",
@@ -40,6 +41,7 @@
     "multer-s3": "^3.0.1",
     "nodemailer": "^6.9.16",
     "rate-limit-redis": "^4.2.0",
+    "serverless-http": "^4.0.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^10.0.0",
     "winston": "^3.17.0",
