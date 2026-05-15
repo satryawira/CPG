@@ -6,6 +6,7 @@ export const redis = new IORedis(env.REDIS_URL, {
   password: env.REDIS_PASSWORD || undefined,
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  lazyConnect: true,
   retryStrategy: (times) => {
     if (times > 10) return null;
     return Math.min(times * 100, 3000);
